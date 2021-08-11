@@ -1,77 +1,69 @@
-from django.shortcuts import render
-from django.http import JsonResponse
-
-from rest_framework.decorators import api_view
-from rest_framework.response import Response
-from rest_framework.request import Request
-import requests
-from rest_framework import status
 from .models import Data
 from .serializers import TaskSerializer
 
+from rest_framework.response import Response
+from rest_framework.decorators import APIView
+from django.http import Http404
+import os
+import requests
 
-@api_view(['GET'])
-def url_list(request):
-    api_urls = {
-        'List':'/data/',
-        'Detail':'/data-detail/<str:pk>',
-        'Create':'/data-create/',
-        'Update':'/data-update/<str:pk>',
-        'Delete':'/data-delete/<str:pk>',
-    }
+
+class CrudView(APIView):
     
-    return Response(api_urls)
+    def get(self, request, pk=None, format=None):
+        id = pk
+        if id == None:
+            data_list = Data.objects.all().order_by('-id')
+            serializer = TaskSerializer(data_list, many=True)
+            return Response(serializer.data)
+        
+        else:
+            try:
+                data_detail = Data.objects.get(id=pk)
+                serializer = TaskSerializer(data_detail, many=False)
+                return Response(serializer.data)
+            except Data.DoesNotExist:
+                raise Http404("No MyModel matches the given query.")
+     
+     
+    def post(self, request, pk=None, format=None):
+        id = pk
+        if id == None:
+            serializer = TaskSerializer(data=request.data)
+            if serializer.is_valid():
+                serializer.save()    
+            return Response(serializer.data)
+    
+        else:
+            try:
+                data = Data.objects.get(id=pk)
+                serializer = TaskSerializer(instance=data, data=request.data)
+                if serializer.is_valid():
+                    serializer.save()
+                return Response(serializer.data)
+            except Data.DoesNotExist:
+                raise Http404("No MyModel matches the given query.")
 
 
-@api_view(['GET'])
-def get_data_list(request):
-	data_list = Data.objects.all().order_by('-id')
-	serializer = TaskSerializer(data_list, many=True)
-	return Response(serializer.data)
+    def delete(self, request, pk, format=None):
+        try:
+            data = Data.objects.get(id=pk)
+            data.delete()
+            return Response('Item succsesfully delete!')
+        except Data.DoesNotExist:
+            raise Http404("No MyModel matches the given query.")
 
-
-@api_view(['GET'])
-def get_data_detail(request, pk):
-	data_detail = Data.objects.get(id=pk)
-	serializer = TaskSerializer(data_detail, many=False)
-	return Response(serializer.data)
+class AlgorithmViews(APIView):
+    
+    def get(self, request, format=None):
+        url = os.environ.get('REQUEST_URL')
+        r = requests.get(url + '/train/')
+        return Response(r.json())
     
     
-@api_view(['POST'])
-def data_create(request):
-    serializer = TaskSerializer(data=request.data)
-    
-    if serializer.is_valid():
-	    serializer.save()
-
-    return Response(serializer.data)
-
-@api_view(['POST'])
-def data_update(request, pk):
-    data = Data.objects.get(id=pk)
-    serializer = TaskSerializer(instance=data, data=request.data)
-
-    if serializer.is_valid():
-    	serializer.save()
-
-    return Response(serializer.data)
+    def post(self, request, format=None):
+        url = os.environ.get('REQUEST_URL')
+        r = requests.post(url + '/predict/', data=request.data)
+        return Response(r.json())
 
 
-@api_view(['DELETE'])
-def data_delete(request, pk):
-	data = Data.objects.get(id=pk)
-	data.delete()
-
-	return Response('Item succsesfully delete!')
-
-
-@api_view(['GET'])
-def get_train(request):
-    r = requests.get('http://127.0.0.1:8000/train')
-    return Response(r.json())
-
-
-@api_view(['POST'])
-def post_predict(request):
-    r = requests.post('http://127.0.0.1:8000/predict', data=request.data)
-    return Response(r.json())
