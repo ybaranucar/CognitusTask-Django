@@ -53,6 +53,7 @@ class CrudView(APIView):
         except Data.DoesNotExist:
             raise Http404("No MyModel matches the given query.")
 
+
 class AlgorithmViews(APIView):
     
     def get(self, request, format=None):
